@@ -13,16 +13,20 @@
 
     // KONFIGURATION: Hier die Button-Werte definieren
     let TAG_BUTTONS = [
-        { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false },
-        { label: '*', value: '*', tooltip: 'Eigene Deff', multiple: false },
-        { label: '*S', value: '*S', tooltip: 'Stammes-Deff', multiple: false },
-        { label: 'X', value: 'X', tooltip: 'Getroffen', multiple: false },
-        { label: 'F', value: 'F', tooltip: 'Fake', multiple: false },
-        { label: '?', value: '?', tooltip: 'Unbekannt', multiple: false }
+        { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false, shortcut: '1' },
+        { label: '*', value: '*', tooltip: 'Eigene Deff', multiple: false, shortcut: '2' },
+        { label: '*S', value: '*S', tooltip: 'Stammes-Deff', multiple: false, shortcut: '3' },
+        { label: 'X', value: 'X', tooltip: 'Getroffen', multiple: false, shortcut: '4' },
+        { label: 'F', value: 'F', tooltip: 'Fake', multiple: false, shortcut: '5' },
+        { label: '?', value: '?', tooltip: 'Unbekannt', multiple: false, shortcut: '6' }
     ];
 
     // Globale Einstellung: Tags vor dem Namen einfügen
     let TAG_BEFORE_NAME = false;
+
+    // Tracking für Änderungen
+    let hasChanges = false;
+    let saveButtonElement = null;
 
     // Lade gespeicherte Einstellungen
     const savedButtons = localStorage.getItem('attack_tagger_buttons');
@@ -66,7 +70,41 @@
         waitForElement('a.overview_filters_manage', (filterLink) => {
             console.log('Filter-Link gefunden, erstelle Button-Leiste');
             createTagButtonBar(filterLink);
+            
+            // Überwache Klicks auf den Filter-Link
+            filterLink.addEventListener('click', () => {
+                console.log('Filter-Dialog wird geöffnet...');
+                // Warte kurz bis der Dialog geladen ist
+                setTimeout(() => {
+                    addTagBoxToFilterDialog();
+                }, 300);
+            });
+
+            // Prüfe regelmäßig ob das Filter-Formular existiert (z.B. nach Reload)
+            const checkInterval = setInterval(() => {
+                const filterForm = document.querySelector('form[action*="save_filters"]');
+                if (filterForm && !document.getElementById('tag_filter_box')) {
+                    console.log('Filter-Formular gefunden (nach Reload), füge Tag-Box hinzu');
+                    addTagBoxToFilterDialog();
+                }
+            }, 500); // Prüfe alle 500ms
         });
+    }
+
+    function updateSaveButtonState() {
+        if (saveButtonElement) {
+            if (hasChanges) {
+                saveButtonElement.style.backgroundColor = '#90EE90';
+                saveButtonElement.style.cursor = 'pointer';
+                saveButtonElement.style.opacity = '1';
+                saveButtonElement.disabled = false;
+            } else {
+                saveButtonElement.style.backgroundColor = '#cccccc';
+                saveButtonElement.style.cursor = 'not-allowed';
+                saveButtonElement.style.opacity = '0.5';
+                saveButtonElement.disabled = true;
+            }
+        }
     }
 
     function createTagButtonBar(filterLink) {
@@ -107,6 +145,8 @@
             button.addEventListener('click', (e) => {
                 e.preventDefault();
                 tagSelectedAttacks(btn.value, btn.multiple);
+                hasChanges = true;
+                updateSaveButtonState();
             });
 
             buttonContainer.appendChild(button);
@@ -141,6 +181,8 @@
         removeButton.addEventListener('click', (e) => {
             e.preventDefault();
             removeTagsFromSelected();
+            hasChanges = true;
+            updateSaveButtonState();
         });
         buttonContainer.appendChild(removeButton);
 
@@ -151,18 +193,28 @@
         saveButton.className = 'btn';
         saveButton.style.cssText = `
             padding: 4px 10px;
-            cursor: pointer;
-            background-color: #90EE90;
+            cursor: not-allowed;
+            background-color: #cccccc;
             font-weight: bold;
+            opacity: 0.5;
         `;
+        saveButton.disabled = true;
         saveButton.addEventListener('click', (e) => {
             e.preventDefault();
-            saveAllSelected();
+            if (hasChanges) {
+                saveAllSelected();
+            }
         });
         buttonContainer.appendChild(saveButton);
 
+        // Speichere Referenz zum Save Button
+        saveButtonElement = saveButton;
+
         // Füge die Button-Leiste direkt nach dem Filter-Link ein
         filterLink.parentNode.insertBefore(buttonContainer, filterLink.nextSibling);
+
+        // Keyboard Shortcuts aktivieren
+        setupKeyboardShortcuts();
     }
 
     async function tagSelectedAttacks(tagValue, isMultiple) {
@@ -334,6 +386,9 @@
         console.log(`${count} Angriffe gespeichert`);
         if (count > 0) {
             showNotification(`${count} Angriff(e) gespeichert`);
+            // Setze hasChanges zurück nach erfolgreichem Speichern
+            hasChanges = false;
+            updateSaveButtonState();
         }
     }
 
@@ -379,6 +434,129 @@
         if (count > 0) {
             showNotification(`Tags von ${count} Angriff(en) entfernt`);
         }
+    }
+
+    function addTagBoxToFilterDialog() {
+        // Finde das Formular mit der action="save_filters"
+        const filterForm = document.querySelector('form[action*="save_filters"]');
+        if (!filterForm) {
+            console.log('Filter-Formular nicht gefunden');
+            return;
+        }
+
+        // Finde die Filter-Tabelle innerhalb des Formulars
+        const filterTable = filterForm.querySelector('table.vis');
+        if (!filterTable) {
+            console.log('Filter-Tabelle nicht gefunden');
+            return;
+        }
+
+        // Prüfe ob die Tag-Box bereits existiert
+        if (document.getElementById('tag_filter_box')) {
+            console.log('Tag-Box existiert bereits');
+            return;
+        }
+
+        // Finde das Befehl-Input-Feld
+        const commandInput = filterForm.querySelector('input[name="filters[target_comment]"]');
+        if (!commandInput) {
+            console.log('Befehl-Feld nicht gefunden');
+            return;
+        }
+
+        console.log('Erstelle Tag-Filter-Box');
+
+        // Erstelle Container für die Tag-Box
+        const tagBox = document.createElement('table');
+        tagBox.id = 'tag_filter_box';
+        tagBox.className = 'vis';
+        tagBox.style.cssText = `
+            margin-left: 10px;
+            vertical-align: top;
+        `;
+
+        tagBox.innerHTML = `
+            <tr>
+                <th>Schnellfilter nach Tags</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">
+                    <div id="tag_filter_buttons" style="display: flex; flex-direction: column; gap: 5px;">
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        // Erstelle einen Wrapper-Div für beide Tabellen
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display: flex; gap: 10px; align-items: flex-start;';
+        
+        // Füge den Wrapper vor der Filter-Tabelle ein (aber innerhalb des Forms)
+        filterTable.parentNode.insertBefore(wrapper, filterTable);
+        wrapper.appendChild(filterTable);
+        wrapper.appendChild(tagBox);
+
+        // Erstelle Buttons für jeden Tag
+        const buttonContainer = document.getElementById('tag_filter_buttons');
+        TAG_BUTTONS.forEach(btn => {
+            const button = document.createElement('button');
+            button.textContent = `[${btn.label}] ${btn.tooltip}`;
+            button.className = 'btn';
+            button.style.cssText = `
+                padding: 5px 10px;
+                cursor: pointer;
+                width: 100%;
+                text-align: left;
+            `;
+
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Setze den Tag-Wert in das Befehl-Feld
+                commandInput.value = `[${btn.label}]`;
+                commandInput.focus();
+                showNotification(`Filter auf [${btn.label}] gesetzt`);
+            });
+
+            buttonContainer.appendChild(button);
+        });
+
+        // Button zum Leeren des Filters
+        const clearButton = document.createElement('button');
+        clearButton.textContent = '🗑️ Filter leeren';
+        clearButton.className = 'btn';
+        clearButton.style.cssText = `
+            padding: 5px 10px;
+            cursor: pointer;
+            width: 100%;
+            background-color: #ffcccc;
+            margin-top: 5px;
+        `;
+        clearButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            commandInput.value = '';
+            commandInput.focus();
+        });
+        buttonContainer.appendChild(clearButton);
+    }
+
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ignoriere Shortcuts wenn in einem Input-Feld
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Finde den Button mit dem passenden Shortcut
+            const button = TAG_BUTTONS.find(btn => btn.shortcut && btn.shortcut.toLowerCase() === e.key.toLowerCase());
+            
+            if (button) {
+                e.preventDefault();
+                tagSelectedAttacks(button.value, button.multiple);
+                hasChanges = true;
+                updateSaveButtonState();
+                showNotification(`Tag [${button.value}] angewendet (Shortcut: ${button.shortcut})`);
+            }
+        });
     }
 
     function showNotification(message) {
@@ -453,6 +631,7 @@
                     <th style="text-align: center; padding: 5px; width: 30px;"></th>
                     <th style="text-align: left; padding: 5px;">Beschreibung</th>
                     <th style="text-align: left; padding: 5px; width: 80px;">Symbol</th>
+                    <th style="text-align: center; padding: 5px; width: 80px;">Shortcut</th>
                     <th style="text-align: center; padding: 5px; width: 80px;">Mehrfach</th>
                     <th style="text-align: center; padding: 5px; width: 50px;">Löschen</th>
                 </tr>
@@ -463,6 +642,7 @@
                         </td>
                         <td style="padding: 5px;"><input type="text" value="${btn.tooltip}" id="tooltip_${index}" style="width: 100%;"></td>
                         <td style="padding: 5px;"><input type="text" value="${btn.label}" id="label_${index}" style="width: 100%;"></td>
+                        <td style="padding: 5px; text-align: center;"><input type="text" value="${btn.shortcut || ''}" id="shortcut_${index}" style="width: 100%; text-align: center;" maxlength="1" placeholder="-"></td>
                         <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${index}" ${btn.multiple ? 'checked' : ''}></td>
                         <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${index}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
                     </tr>
@@ -520,6 +700,7 @@
                 </td>
                 <td style="padding: 5px;"><input type="text" value="Neuer Tag" id="tooltip_${tagCounter}" style="width: 100%;"></td>
                 <td style="padding: 5px;"><input type="text" value="N" id="label_${tagCounter}" style="width: 100%;"></td>
+                <td style="padding: 5px; text-align: center;"><input type="text" value="" id="shortcut_${tagCounter}" style="width: 100%; text-align: center;" maxlength="1" placeholder="-"></td>
                 <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${tagCounter}"></td>
                 <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${tagCounter}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
             `;
@@ -552,13 +733,15 @@
                 const index = row.getAttribute('data-index');
                 const tooltipInput = document.getElementById(`tooltip_${index}`);
                 const labelInput = document.getElementById(`label_${index}`);
+                const shortcutInput = document.getElementById(`shortcut_${index}`);
                 const multipleInput = document.getElementById(`multiple_${index}`);
 
-                if (tooltipInput && labelInput && multipleInput) {
+                if (tooltipInput && labelInput && multipleInput && shortcutInput) {
                     TAG_BUTTONS.push({
                         tooltip: tooltipInput.value,
                         label: labelInput.value,
                         value: labelInput.value,
+                        shortcut: shortcutInput.value.trim(),
                         multiple: multipleInput.checked
                     });
                 }
