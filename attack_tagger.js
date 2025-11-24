@@ -24,6 +24,7 @@
     let TAG_BEFORE_NAME = false;
     let hasChanges = false;
     let saveButtonElement = null;
+    let isSaving = false;
     const savedButtons = localStorage.getItem('attack_tagger_buttons');
     if (savedButtons) {
         try {
@@ -199,7 +200,7 @@
         saveButton.addEventListener('click', (e) => {
             e.preventDefault();
             if (hasChanges) {
-                saveAllSelected();
+                saveNextSelected();
             }
         });
         mainContainer.appendChild(saveButton);
@@ -227,6 +228,8 @@
         for (const checkbox of checkboxes) {
             const row = checkbox.closest('tr');
             if (!row) continue;
+
+            row.removeAttribute('data-attack-saved');
 
             const quickedit = row.querySelector('.quickedit');
             if (!quickedit) continue;
@@ -266,62 +269,105 @@
         }
     }
 
-    async function saveAllSelected() {
+    async function saveNextSelected() {
+        if (isSaving) {
+            return;
+        }
+        
+        isSaving = true;
+        
+        if (saveButtonElement) {
+            saveButtonElement.style.backgroundColor = '#cccccc';
+            saveButtonElement.style.cursor = 'not-allowed';
+            saveButtonElement.style.opacity = '0.5';
+            saveButtonElement.disabled = true;
+        }
+        
         let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
         checkboxes = Array.from(checkboxes).filter(cb => {
             const name = cb.getAttribute('name');
             return name && name.startsWith('id_');
         });
 
+        checkboxes = checkboxes.filter(cb => {
+            const row = cb.closest('tr');
+            return row && !row.hasAttribute('data-attack-saved');
+        });
+
         if (checkboxes.length === 0) {
             alert('Bitte wähle mindestens einen Angriff aus!');
+            isSaving = false;
             return;
         }
 
-        let count = 0;
+        const checkbox = checkboxes[0];
+        const row = checkbox.closest('tr');
+        if (!row) {
+            showNotification('Fehler: Zeile nicht gefunden');
+            isSaving = false;
+            return;
+        }
 
-        for (const checkbox of checkboxes) {
-            const row = checkbox.closest('tr');
-            if (!row) continue;
+        const renameLink = row.querySelector('a.rename-icon');
+        if (!renameLink) {
+            showNotification('Fehler: Umbenennen-Link nicht gefunden');
+            isSaving = false;
+            return;
+        }
 
-            const renameLink = row.querySelector('a.rename-icon');
-            if (!renameLink) continue;
+        renameLink.click();
 
-            renameLink.click();
+        let submitButton = null;
+        let attempts = 0;
+        const maxAttempts = 20;
 
-            let submitButton = null;
-            let attempts = 0;
-            const maxAttempts = 30;
+        while (!submitButton && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-            while (!submitButton && attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+            const quickeditEdit = row.querySelector('.quickedit-edit');
 
-                const quickeditEdit = row.querySelector('.quickedit-edit');
-
-                if (quickeditEdit) {
-                    const style = window.getComputedStyle(quickeditEdit);
-                    if (style.display !== 'none') {
-                        submitButton = quickeditEdit.querySelector('input[type="button"][value="Umbenennen"]');
-                    }
+            if (quickeditEdit) {
+                const style = window.getComputedStyle(quickeditEdit);
+                if (style.display !== 'none') {
+                    submitButton = quickeditEdit.querySelector('input[type="button"][value="Umbenennen"]');
                 }
-
-                attempts++;
             }
 
-            if (submitButton) {
-                await new Promise(resolve => setTimeout(resolve, 150));
-                submitButton.click();
-                await new Promise(resolve => setTimeout(resolve, 400));
+            attempts++;
+        }
+
+        if (submitButton) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            submitButton.click();
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            row.setAttribute('data-attack-saved', 'true');
+            
+            const remaining = checkboxes.length - 1;
+            if (remaining > 0) {
+                showNotification(`Gespeichert! Noch ${remaining} Angriff(e) übrig`);
+                if (saveButtonElement) {
+                    saveButtonElement.style.backgroundColor = '#90EE90';
+                    saveButtonElement.style.cursor = 'pointer';
+                    saveButtonElement.style.opacity = '1';
+                    saveButtonElement.disabled = false;
+                }
+            } else {
+                showNotification('Alle Angriffe gespeichert!');
+                hasChanges = false;
+                updateSaveButtonState();
             }
-
-            count++;
+        } else {
+            showNotification('Fehler: Umbenennen-Button nicht gefunden');
+            if (saveButtonElement && hasChanges) {
+                saveButtonElement.style.backgroundColor = '#90EE90';
+                saveButtonElement.style.cursor = 'pointer';
+                saveButtonElement.style.opacity = '1';
+                saveButtonElement.disabled = false;
+            }
         }
-
-        if (count > 0) {
-            showNotification(`${count} Angriff(e) gespeichert`);
-            hasChanges = false;
-            updateSaveButtonState();
-        }
+        
+        isSaving = false;
     }
 
     async function removeTagsFromSelected() {
@@ -343,6 +389,8 @@
         for (const checkbox of checkboxes) {
             const row = checkbox.closest('tr');
             if (!row) continue;
+
+            row.removeAttribute('data-attack-saved');
 
             const quickedit = row.querySelector('.quickedit');
             if (!quickedit) continue;
@@ -460,6 +508,12 @@
     function setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (e.key === 'Enter' && hasChanges) {
+                e.preventDefault();
+                saveNextSelected();
                 return;
             }
 
@@ -619,7 +673,7 @@
                 <div style="white-space: nowrap;">
                     <label>
                         <input type="radio" name="tag_position" value="before" ${TAG_BEFORE_NAME ? 'checked' : ''}>
-                        Name
+                        [x] Name [x]
                     </label>
                     <label style="margin-right: 10px;">
                         <input type="radio" name="tag_position" value="after" ${!TAG_BEFORE_NAME ? 'checked' : ''}>
@@ -806,3 +860,9 @@
     }
 
 })();
+
+
+
+
+
+
