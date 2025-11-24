@@ -108,9 +108,9 @@
     }
 
     function createTagButtonBar(filterLink) {
-        // Erstelle Container für die Buttons
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = `
+        // Erstelle Haupt-Container
+        const mainContainer = document.createElement('div');
+        mainContainer.style.cssText = `
             margin: 10px 0;
             padding: 3px;
             background-color: #f4e4bc;
@@ -118,38 +118,58 @@
             border-radius: 4px;
             display: flex;
             gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
+            align-items: flex-start;
         `;
 
         // Label hinzufügen
         const label = document.createElement('span');
         label.textContent = 'Tags:';
         label.style.fontWeight = 'bold';
-        label.style.marginRight = '5px';
-        buttonContainer.appendChild(label);
+        label.style.marginTop = '4px';
+        mainContainer.appendChild(label);
+
+        // Container für die Buttons (mit wrap)
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            flex-wrap: wrap;
+            flex: 1;
+        `;
+        mainContainer.appendChild(buttonContainer);
 
         // Buttons erstellen
         TAG_BUTTONS.forEach(btn => {
-            const button = document.createElement('button');
-            button.textContent = btn.label;
-            button.className = 'btn';
-            button.title = btn.tooltip; // Tooltip beim Hover
-            button.style.cssText = `
-                padding: 4px 10px;
-                cursor: pointer;
-                min-width: 35px;
-                font-weight: bold;
-            `;
+            if (btn.isSeparator) {
+                // Zeilenumbruch: Erzwinge neue Zeile ohne sichtbare Linie
+                const separator = document.createElement('div');
+                separator.style.cssText = `
+                    width: 100%;
+                    height: 0;
+                `;
+                buttonContainer.appendChild(separator);
+            } else {
+                const button = document.createElement('button');
+                button.textContent = btn.label;
+                button.className = 'btn';
+                button.title = btn.tooltip; // Tooltip beim Hover
+                button.style.cssText = `
+                    padding: 4px 10px;
+                    cursor: pointer;
+                    min-width: 35px;
+                    font-weight: bold;
+                `;
 
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
-                tagSelectedAttacks(btn.value, btn.multiple);
-                hasChanges = true;
-                updateSaveButtonState();
-            });
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    tagSelectedAttacks(btn.value, btn.multiple);
+                    hasChanges = true;
+                    updateSaveButtonState();
+                });
 
-            buttonContainer.appendChild(button);
+                buttonContainer.appendChild(button);
+            }
         });
 
         // Settings Button
@@ -166,7 +186,7 @@
             e.preventDefault();
             showSettings();
         });
-        buttonContainer.appendChild(settingsButton);
+        mainContainer.appendChild(settingsButton);
 
         // Button zum Entfernen von Tags
         const removeButton = document.createElement('button');
@@ -184,7 +204,7 @@
             hasChanges = true;
             updateSaveButtonState();
         });
-        buttonContainer.appendChild(removeButton);
+        mainContainer.appendChild(removeButton);
 
         // Speichern Button
         const saveButton = document.createElement('button');
@@ -205,13 +225,13 @@
                 saveAllSelected();
             }
         });
-        buttonContainer.appendChild(saveButton);
+        mainContainer.appendChild(saveButton);
 
         // Speichere Referenz zum Save Button
         saveButtonElement = saveButton;
 
         // Füge die Button-Leiste direkt nach dem Filter-Link ein
-        filterLink.parentNode.insertBefore(buttonContainer, filterLink.nextSibling);
+        filterLink.parentNode.insertBefore(mainContainer, filterLink.nextSibling);
 
         // Keyboard Shortcuts aktivieren
         setupKeyboardShortcuts();
@@ -499,25 +519,31 @@
         // Erstelle Buttons für jeden Tag
         const buttonContainer = document.getElementById('tag_filter_buttons');
         TAG_BUTTONS.forEach(btn => {
-            const button = document.createElement('button');
-            button.textContent = `[${btn.label}] ${btn.tooltip}`;
-            button.className = 'btn';
-            button.style.cssText = `
-                padding: 5px 10px;
-                cursor: pointer;
-                width: 100%;
-                text-align: left;
-            `;
+            if (btn.isSeparator) {
+                // Zeilenumbruch im Filter-Dialog (kein Button)
+                // Separator wird einfach übersprungen, da Buttons untereinander sind
+                return;
+            } else {
+                const button = document.createElement('button');
+                button.textContent = `[${btn.label}] ${btn.tooltip}`;
+                button.className = 'btn';
+                button.style.cssText = `
+                    padding: 5px 10px;
+                    cursor: pointer;
+                    width: 100%;
+                    text-align: left;
+                `;
 
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
-                // Setze den Tag-Wert in das Befehl-Feld
-                commandInput.value = `[${btn.label}]`;
-                commandInput.focus();
-                showNotification(`Filter auf [${btn.label}] gesetzt`);
-            });
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // Setze den Tag-Wert in das Befehl-Feld
+                    commandInput.value = `[${btn.label}]`;
+                    commandInput.focus();
+                    showNotification(`Filter auf [${btn.label}] gesetzt`);
+                });
 
-            buttonContainer.appendChild(button);
+                buttonContainer.appendChild(button);
+            }
         });
 
         // Button zum Leeren des Filters
@@ -586,6 +612,92 @@
         }, 3000);
     }
 
+    function showHelp() {
+        const helpOverlay = document.createElement('div');
+        helpOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10001;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        const helpDialog = document.createElement('div');
+        helpDialog.style.cssText = `
+            background-color: #f4e4bc;
+            border: 2px solid #7d510f;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        `;
+
+        helpDialog.innerHTML = `
+            <h3 style="margin-top: 0; color: #7d510f; text-align: center;">📚 Attack Tagger - Hilfe</h3>
+            
+            <h4 style="color: #7d510f; margin-top: 15px;">🎯 Was macht dieses Script?</h4>
+            <p>Der Attack Tagger ermöglicht es dir, eingehende Angriffe schnell und einfach mit Tags zu versehen, um sie besser zu organisieren und zu filtern.</p>
+            
+            <h4 style="color: #7d510f; margin-top: 15px;">🚀 Hauptfunktionen:</h4>
+            <ul style="line-height: 1.6;">
+                <li><strong>Tags vergeben:</strong> Wähle Angriffe aus (Checkboxen) und klicke auf einen Tag-Button</li>
+                <li><strong>Keyboard Shortcuts:</strong> Nutze Tastenkombinationen für noch schnelleres Taggen</li>
+                <li><strong>Speichern:</strong> Der 💾-Button wird aktiv wenn Änderungen vorliegen</li>
+                <li><strong>Tags entfernen:</strong> ❌-Button entfernt alle Tags von ausgewählten Angriffen</li>
+                <li><strong>Filtern:</strong> Nutze "Filter verwalten" um nur Angriffe mit bestimmten Tags anzuzeigen</li>
+            </ul>
+            
+            <h4 style="color: #7d510f; margin-top: 15px;">⚙️ Einstellungen:</h4>
+            <ul style="line-height: 1.6;">
+                <li><strong>Beschreibung:</strong> Name des Tags (wird im Tooltip angezeigt)</li>
+                <li><strong>Symbol:</strong> Das Zeichen das im Tag verwendet wird (z.B. !, *, F)</li>
+                <li><strong>Shortcut:</strong> Tastenkombination zum schnellen Taggen (z.B. 1, 2, 3)</li>
+                <li><strong>Mehrfach:</strong> Wenn aktiviert, werden Tags hinzugefügt statt ersetzt</li>
+                <li><strong>Position:</strong> Tags vor oder nach dem Befehls-Namen einfügen</li>
+                <li><strong>Sortieren:</strong> Ziehe die Zeilen mit ⋮⋮ um die Reihenfolge zu ändern</li>
+            </ul>
+            
+            <h4 style="color: #7d510f; margin-top: 15px;">📝 Workflow-Beispiel:</h4>
+            <ol style="line-height: 1.6;">
+                <li>Angriffe auswählen (Checkboxen anklicken)</li>
+                <li>Tag-Button klicken oder Shortcut-Taste drücken (z.B. "5" für Fake)</li>
+                <li>Speicher-Button wird aktiv → auf 💾 klicken zum Speichern</li>
+                <li>"Filter verwalten" öffnen und Tag im Befehl-Feld eingeben (z.B. [F])</li>
+                <li>Nur Angriffe mit diesem Tag werden angezeigt</li>
+            </ol>
+
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #7d510f;">
+            <p style="text-align: center; color: #7d510f; font-size: 12px; margin: 10px 0;">
+                <strong>📜 Big Madness</strong>
+            </p>
+
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn" id="help_close" style="padding: 8px 20px;">Schließen</button>
+            </div>
+        `;
+
+        helpOverlay.appendChild(helpDialog);
+        document.body.appendChild(helpOverlay);
+
+        // Event Listener
+        document.getElementById('help_close').addEventListener('click', () => {
+            helpOverlay.remove();
+        });
+
+        helpOverlay.addEventListener('click', (e) => {
+            if (e.target === helpOverlay) {
+                helpOverlay.remove();
+            }
+        });
+    }
+
     function showSettings() {
         // Erstelle Settings-Dialog
         const overlay = document.createElement('div');
@@ -610,10 +722,12 @@
             padding: 20px;
             max-width: 450px;
             width: 90%;
+            position: relative;
         `;
 
         dialog.innerHTML = `
-            <h3 style="margin-top: 0; color: #7d510f;">Tag-Einstellungen</h3>
+            <span id="help_button" style="position: absolute; top: 8px; right: 8px; cursor: pointer; font-size: 18px; user-select: none; line-height: 1; color: #000;" title="Hilfe anzeigen">❓</span>
+            <h3 style="margin: 0 0 10px 0; color: #7d510f;">Tag-Einstellungen</h3>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <p style="margin: 0;">Hier kannst du die Tags anpassen:</p>
                 <div style="white-space: nowrap;">
@@ -640,16 +754,25 @@
                         <td style="padding: 5px; text-align: center;">
                             <div class="bqhandle" style="cursor: move; font-size: 16px;" title="Ziehen zum Verschieben">⋮⋮</div>
                         </td>
-                        <td style="padding: 5px;"><input type="text" value="${btn.tooltip}" id="tooltip_${index}" style="width: 100%;"></td>
-                        <td style="padding: 5px;"><input type="text" value="${btn.label}" id="label_${index}" style="width: 100%;"></td>
-                        <td style="padding: 5px; text-align: center;"><input type="text" value="${btn.shortcut || ''}" id="shortcut_${index}" style="width: 100%; text-align: center;" maxlength="1" placeholder="-"></td>
-                        <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${index}" ${btn.multiple ? 'checked' : ''}></td>
-                        <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${index}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
+                        <td style="padding: 5px;">
+                            ${btn.isSeparator ? '<strong style="color: #7d510f;">Trennlinie</strong>' : `<input type="text" value="${btn.tooltip}" id="tooltip_${index}" style="width: 100%;">`}
+                        </td>
+                        <td style="padding: 5px;">
+                            ${btn.isSeparator ? '' : `<input type="text" value="${btn.label}" id="label_${index}" style="width: 100%;">`}
+                        </td>
+                        <td style="padding: 5px; text-align: center;">
+                            ${btn.isSeparator ? '' : `<input type="text" value="${btn.shortcut || ''}" id="shortcut_${index}" style="width: 100%; text-align: center;" maxlength="1" placeholder="-">`}
+                        </td>
+                        <td style="padding: 5px; text-align: center;">
+                            ${btn.isSeparator ? '' : `<input type="checkbox" id="multiple_${index}" ${btn.multiple ? 'checked' : ''}>`}
+                        </td>
+                        <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${index}" style="padding: 2px 8px; background-color: #ffcccc;">🗑️</button></td>
                     </tr>
                 `).join('')}
             </table>
-            <div style="margin-top: 10px;">
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
                 <button class="btn" id="add_tag_button">+ Neuer Tag</button>
+                <button class="btn" id="add_separator_button">+ Trennlinie</button>
             </div>
             <div style="margin-top: 20px; text-align: right;">
                 <button class="btn" id="settings_cancel" style="margin-right: 10px;">Abbrechen</button>
@@ -663,6 +786,11 @@
         let tagCounter = TAG_BUTTONS.length;
 
         // Event Listeners
+        document.getElementById('help_button').addEventListener('click', (e) => {
+            e.preventDefault();
+            showHelp();
+        });
+
         document.getElementById('settings_cancel').addEventListener('click', () => {
             overlay.remove();
         });
@@ -688,6 +816,35 @@
             }
         });
 
+        // Trennlinie hinzufügen
+        document.getElementById('add_separator_button').addEventListener('click', () => {
+            const table = document.getElementById('tags_table');
+            const newRow = document.createElement('tr');
+            newRow.setAttribute('data-index', tagCounter);
+            newRow.setAttribute('data-separator', 'true');
+            newRow.className = 'sortable-row';
+            newRow.innerHTML = `
+                <td style="padding: 5px; text-align: center;">
+                    <div class="bqhandle" style="cursor: move; font-size: 16px;" title="Ziehen zum Verschieben">⋮⋮</div>
+                </td>
+                <td colspan="4" style="padding: 5px;">
+                    <strong style="color: #7d510f;">── Trennlinie ──</strong>
+                </td>
+                <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${tagCounter}" style="padding: 2px 8px; background-color: #ffcccc;">🗑️</button></td>
+            `;
+            table.appendChild(newRow);
+
+            // Event Listener für den neuen Löschen-Button
+            newRow.querySelector('.btn-delete').addEventListener('click', function() {
+                this.closest('tr').remove();
+            });
+
+            // Refresh sortable nach dem Hinzufügen
+            $('#tags_table').sortable('refresh');
+
+            tagCounter++;
+        });
+
         // Neuen Tag hinzufügen
         document.getElementById('add_tag_button').addEventListener('click', () => {
             const table = document.getElementById('tags_table');
@@ -702,7 +859,7 @@
                 <td style="padding: 5px;"><input type="text" value="N" id="label_${tagCounter}" style="width: 100%;"></td>
                 <td style="padding: 5px; text-align: center;"><input type="text" value="" id="shortcut_${tagCounter}" style="width: 100%; text-align: center;" maxlength="1" placeholder="-"></td>
                 <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${tagCounter}"></td>
-                <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${tagCounter}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
+                <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${tagCounter}" style="padding: 2px 8px; background-color: #ffcccc;">🗑️</button></td>
             `;
             table.appendChild(newRow);
 
@@ -731,19 +888,27 @@
 
             rows.forEach(row => {
                 const index = row.getAttribute('data-index');
-                const tooltipInput = document.getElementById(`tooltip_${index}`);
-                const labelInput = document.getElementById(`label_${index}`);
-                const shortcutInput = document.getElementById(`shortcut_${index}`);
-                const multipleInput = document.getElementById(`multiple_${index}`);
-
-                if (tooltipInput && labelInput && multipleInput && shortcutInput) {
+                const isSeparator = row.getAttribute('data-separator') === 'true';
+                
+                if (isSeparator) {
                     TAG_BUTTONS.push({
-                        tooltip: tooltipInput.value,
-                        label: labelInput.value,
-                        value: labelInput.value,
-                        shortcut: shortcutInput.value.trim(),
-                        multiple: multipleInput.checked
+                        isSeparator: true
                     });
+                } else {
+                    const tooltipInput = document.getElementById(`tooltip_${index}`);
+                    const labelInput = document.getElementById(`label_${index}`);
+                    const shortcutInput = document.getElementById(`shortcut_${index}`);
+                    const multipleInput = document.getElementById(`multiple_${index}`);
+
+                    if (tooltipInput && labelInput && multipleInput && shortcutInput) {
+                        TAG_BUTTONS.push({
+                            tooltip: tooltipInput.value,
+                            label: labelInput.value,
+                            value: labelInput.value,
+                            shortcut: shortcutInput.value.trim(),
+                            multiple: multipleInput.checked
+                        });
+                    }
                 }
             });
 
