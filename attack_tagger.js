@@ -1,0 +1,587 @@
+// ==UserScript==
+// @name         Tribal Wars - Attack Tagger
+// @version      1.0
+// @description  Schnelles Umbenennen von Angriffen mit vordefinierten Werten
+// @author       Big Madness
+// @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
+// @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // KONFIGURATION: Hier die Button-Werte definieren
+    let TAG_BUTTONS = [
+        { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false },
+        { label: '*', value: '*', tooltip: 'Eigene Deff', multiple: false },
+        { label: '*S', value: '*S', tooltip: 'Stammes-Deff', multiple: false },
+        { label: 'X', value: 'X', tooltip: 'Getroffen', multiple: false },
+        { label: 'F', value: 'F', tooltip: 'Fake', multiple: false },
+        { label: '?', value: '?', tooltip: 'Unbekannt', multiple: false }
+    ];
+
+    // Globale Einstellung: Tags vor dem Namen einfügen
+    let TAG_BEFORE_NAME = false;
+
+    // Lade gespeicherte Einstellungen
+    const savedButtons = localStorage.getItem('attack_tagger_buttons');
+    if (savedButtons) {
+        try {
+            TAG_BUTTONS = JSON.parse(savedButtons);
+        } catch (e) {
+            console.log('Fehler beim Laden der Einstellungen');
+        }
+    }
+
+    const savedTagBefore = localStorage.getItem('attack_tagger_before');
+    if (savedTagBefore !== null) {
+        TAG_BEFORE_NAME = savedTagBefore === 'true';
+    }
+
+    // Warte bis die Seite vollständig geladen ist
+    function waitForElement(selector, callback, maxAttempts = 50) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(interval);
+                callback(element);
+            } else if (++attempts >= maxAttempts) {
+                clearInterval(interval);
+                console.log('Element nicht gefunden:', selector);
+            }
+        }, 100);
+    }
+
+    // Starte nach vollständigem Laden
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    function init() {
+        // Warte auf den Filter-Link
+        waitForElement('a.overview_filters_manage', (filterLink) => {
+            console.log('Filter-Link gefunden, erstelle Button-Leiste');
+            createTagButtonBar(filterLink);
+        });
+    }
+
+    function createTagButtonBar(filterLink) {
+        // Erstelle Container für die Buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            margin: 10px 0;
+            padding: 3px;
+            background-color: #f4e4bc;
+            border: 1px solid #7d510f;
+            border-radius: 4px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        `;
+
+        // Label hinzufügen
+        const label = document.createElement('span');
+        label.textContent = 'Tags:';
+        label.style.fontWeight = 'bold';
+        label.style.marginRight = '5px';
+        buttonContainer.appendChild(label);
+
+        // Buttons erstellen
+        TAG_BUTTONS.forEach(btn => {
+            const button = document.createElement('button');
+            button.textContent = btn.label;
+            button.className = 'btn';
+            button.title = btn.tooltip; // Tooltip beim Hover
+            button.style.cssText = `
+                padding: 4px 10px;
+                cursor: pointer;
+                min-width: 35px;
+                font-weight: bold;
+            `;
+
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                tagSelectedAttacks(btn.value, btn.multiple);
+            });
+
+            buttonContainer.appendChild(button);
+        });
+
+        // Settings Button
+        const settingsButton = document.createElement('button');
+        settingsButton.textContent = '⚙️';
+        settingsButton.title = 'Einstellungen'; // Tooltip
+        settingsButton.className = 'btn';
+        settingsButton.style.cssText = `
+            padding: 4px 10px;
+            cursor: pointer;
+            margin-left: auto;
+        `;
+        settingsButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSettings();
+        });
+        buttonContainer.appendChild(settingsButton);
+
+        // Button zum Entfernen von Tags
+        const removeButton = document.createElement('button');
+        removeButton.textContent = '❌';
+        removeButton.title = 'Tags entfernen'; // Tooltip
+        removeButton.className = 'btn';
+        removeButton.style.cssText = `
+            padding: 4px 10px;
+            cursor: pointer;
+            background-color: #ffcccc;
+        `;
+        removeButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            removeTagsFromSelected();
+        });
+        buttonContainer.appendChild(removeButton);
+
+        // Speichern Button
+        const saveButton = document.createElement('button');
+        saveButton.textContent = '💾';
+        saveButton.title = 'Änderungen speichern'; // Tooltip
+        saveButton.className = 'btn';
+        saveButton.style.cssText = `
+            padding: 4px 10px;
+            cursor: pointer;
+            background-color: #90EE90;
+            font-weight: bold;
+        `;
+        saveButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            saveAllSelected();
+        });
+        buttonContainer.appendChild(saveButton);
+
+        // Füge die Button-Leiste direkt nach dem Filter-Link ein
+        filterLink.parentNode.insertBefore(buttonContainer, filterLink.nextSibling);
+    }
+
+    async function tagSelectedAttacks(tagValue, isMultiple) {
+        // Finde alle markierten Checkboxen (name="id_XXXXXX")
+        let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+
+        // Filtere nur die Angriffs-Checkboxen
+        checkboxes = Array.from(checkboxes).filter(cb => {
+            const name = cb.getAttribute('name');
+            return name && name.startsWith('id_');
+        });
+
+        console.log('Gefundene Checkboxen:', checkboxes.length);
+
+        if (checkboxes.length === 0) {
+            alert('Bitte wähle mindestens einen Angriff aus!');
+            return;
+        }
+
+        let count = 0;
+
+        // Verarbeite sequenziell mit async/await
+        for (const checkbox of checkboxes) {
+            const row = checkbox.closest('tr');
+            if (!row) {
+                console.log('Keine Zeile gefunden für Checkbox');
+                continue;
+            }
+
+            // Finde das quickedit Element
+            const quickedit = row.querySelector('.quickedit');
+            if (!quickedit) {
+                console.log('Kein quickedit Element gefunden');
+                continue;
+            }
+
+            // Hole die Command ID aus dem data-id Attribut
+            const commandId = quickedit.getAttribute('data-id');
+            if (!commandId) {
+                console.log('Keine Command ID gefunden');
+                continue;
+            }
+
+            // Finde das Label-Element innerhalb von quickedit
+            const labelSpan = quickedit.querySelector('.quickedit-label');
+            if (!labelSpan) {
+                console.log('Kein Label gefunden für Command:', commandId);
+                continue;
+            }
+
+            const currentName = labelSpan.textContent.trim();
+            console.log('Aktueller Name:', currentName);
+
+            let newName;
+            if (isMultiple) {
+                // Mehrfach: Füge Tag hinzu ohne bestehende zu entfernen
+                if (TAG_BEFORE_NAME) {
+                    newName = `[${tagValue}] ${currentName}`;
+                } else {
+                    newName = `${currentName} [${tagValue}]`;
+                }
+            } else {
+                // Einmalig: Entferne existierende Tags und ersetze
+                const nameWithoutTags = currentName.replace(/\s*\[.*?\]\s*/g, '').trim();
+                if (TAG_BEFORE_NAME) {
+                    newName = `[${tagValue}] ${nameWithoutTags}`;
+                } else {
+                    newName = `${nameWithoutTags} [${tagValue}]`;
+                }
+            }
+
+            // Aktualisiere das Label im DOM sofort
+            labelSpan.textContent = newName;
+            console.log('Name im DOM geändert:', newName);
+
+            count++;
+        }
+
+        console.log(`${count} Angriffe mit Tag [${tagValue}] versehen`);
+
+        if (count > 0) {
+            showNotification(`${count} Angriff(e) mit [${tagValue}] getaggt`);
+        } else {
+            alert('Keine Namensfelder gefunden. Bitte öffne die Konsole (F12) für Details.');
+        }
+    }
+
+    async function saveAllSelected() {
+        // Finde alle markierten Checkboxen
+        let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+
+        // Filtere nur die Angriffs-Checkboxen
+        checkboxes = Array.from(checkboxes).filter(cb => {
+            const name = cb.getAttribute('name');
+            return name && name.startsWith('id_');
+        });
+
+        if (checkboxes.length === 0) {
+            alert('Bitte wähle mindestens einen Angriff aus!');
+            return;
+        }
+
+        let count = 0;
+
+        // Verarbeite sequenziell
+        for (const checkbox of checkboxes) {
+            const row = checkbox.closest('tr');
+            if (!row) continue;
+
+            // Finde den Umbenennen-Link
+            const renameLink = row.querySelector('a.rename-icon');
+            if (!renameLink) {
+                console.log('Kein Umbenennen-Link gefunden');
+                continue;
+            }
+
+            // Klicke auf den Umbenennen-Link (aktiviert das Edit-Feld)
+            renameLink.click();
+            console.log('Umbenennen-Link geklickt');
+
+            // Warte bis der Button sichtbar wird
+            let submitButton = null;
+            let attempts = 0;
+            const maxAttempts = 30; // 30 * 100ms = 3 Sekunden
+
+            while (!submitButton && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Suche den Button in der quickedit-edit Span
+                const quickeditEdit = row.querySelector('.quickedit-edit');
+
+                if (quickeditEdit) {
+                    // Prüfe ob der Button sichtbar ist
+                    const style = window.getComputedStyle(quickeditEdit);
+                    if (style.display !== 'none') {
+                        submitButton = quickeditEdit.querySelector('input[type="button"][value="Umbenennen"]');
+                        if (submitButton) {
+                            console.log('Button gefunden nach', attempts * 100, 'ms');
+                        }
+                    }
+                }
+
+                if (!submitButton && attempts % 10 === 0) {
+                    console.log(`Versuch ${attempts}: Button noch nicht sichtbar`);
+                }
+
+                attempts++;
+            }
+
+            if (submitButton) {
+                console.log('Button gefunden nach', attempts * 100, 'ms');
+
+                // Kurzer Delay vor dem Klick
+                await new Promise(resolve => setTimeout(resolve, 150));
+
+                // Klicke auf den Umbenennen-Button
+                submitButton.click();
+                console.log('Umbenennen-Button geklickt');
+
+                // Warte bis das Popup geschlossen wird
+                await new Promise(resolve => setTimeout(resolve, 400));
+            } else {
+                console.log('❌ Umbenennen-Button nicht gefunden nach', attempts * 100, 'ms');
+            }
+
+            count++;
+        }
+
+        console.log(`${count} Angriffe gespeichert`);
+        if (count > 0) {
+            showNotification(`${count} Angriff(e) gespeichert`);
+        }
+    }
+
+    async function removeTagsFromSelected() {
+        let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+
+        // Filtere nur die Angriffs-Checkboxen
+        checkboxes = Array.from(checkboxes).filter(cb => {
+            const name = cb.getAttribute('name');
+            return name && name.startsWith('id_');
+        });
+
+        if (checkboxes.length === 0) {
+            alert('Bitte wähle mindestens einen Angriff aus!');
+            return;
+        }
+
+        let count = 0;
+
+        // Verarbeite sequenziell mit async/await
+        for (const checkbox of checkboxes) {
+            const row = checkbox.closest('tr');
+            if (!row) continue;
+
+            const quickedit = row.querySelector('.quickedit');
+            if (!quickedit) continue;
+
+            const labelSpan = quickedit.querySelector('.quickedit-label');
+            if (!labelSpan) continue;
+
+            // Entferne alle Tags in eckigen Klammern
+            const currentName = labelSpan.textContent.trim();
+            const newName = currentName.replace(/\s*\[.*?\]\s*/g, '').trim();
+
+            // Aktualisiere das Label im DOM sofort
+            labelSpan.textContent = newName;
+            console.log('Tags im DOM entfernt:', newName);
+
+            count++;
+        }
+
+        console.log(`Tags von ${count} Angriffen entfernt`);
+        if (count > 0) {
+            showNotification(`Tags von ${count} Angriff(en) entfernt`);
+        }
+    }
+
+    function showNotification(message) {
+        // Erstelle eine temporäre Benachrichtigung
+        const notification = document.createElement('div');
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-weight: bold;
+        `;
+
+        document.body.appendChild(notification);
+
+        // Entferne nach 3 Sekunden
+        setTimeout(() => {
+            notification.style.transition = 'opacity 0.5s';
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 500);
+        }, 3000);
+    }
+
+    function showSettings() {
+        // Erstelle Settings-Dialog
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background-color: #f4e4bc;
+            border: 2px solid #7d510f;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 450px;
+            width: 90%;
+        `;
+
+        dialog.innerHTML = `
+            <h3 style="margin-top: 0; color: #7d510f;">Tag-Einstellungen</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <p style="margin: 0;">Hier kannst du die Tags anpassen:</p>
+                <div style="white-space: nowrap;">
+                    <label>
+                        <input type="radio" name="tag_position" value="before" ${TAG_BEFORE_NAME ? 'checked' : ''}>
+                        Name
+                    </label>
+                    <label style="margin-right: 10px;">
+                        <input type="radio" name="tag_position" value="after" ${!TAG_BEFORE_NAME ? 'checked' : ''}>
+                    </label>
+                </div>
+            </div>
+            <table id="tags_table" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <th style="text-align: center; padding: 5px; width: 30px;"></th>
+                    <th style="text-align: left; padding: 5px;">Beschreibung</th>
+                    <th style="text-align: left; padding: 5px; width: 80px;">Symbol</th>
+                    <th style="text-align: center; padding: 5px; width: 80px;">Mehrfach</th>
+                    <th style="text-align: center; padding: 5px; width: 50px;">Löschen</th>
+                </tr>
+                ${TAG_BUTTONS.map((btn, index) => `
+                    <tr data-index="${index}" class="sortable-row">
+                        <td style="padding: 5px; text-align: center;">
+                            <div class="bqhandle" style="cursor: move; font-size: 16px;" title="Ziehen zum Verschieben">⋮⋮</div>
+                        </td>
+                        <td style="padding: 5px;"><input type="text" value="${btn.tooltip}" id="tooltip_${index}" style="width: 100%;"></td>
+                        <td style="padding: 5px;"><input type="text" value="${btn.label}" id="label_${index}" style="width: 100%;"></td>
+                        <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${index}" ${btn.multiple ? 'checked' : ''}></td>
+                        <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${index}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
+                    </tr>
+                `).join('')}
+            </table>
+            <div style="margin-top: 10px;">
+                <button class="btn" id="add_tag_button">+ Neuer Tag</button>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn" id="settings_cancel" style="margin-right: 10px;">Abbrechen</button>
+                <button class="btn" id="settings_save">Speichern</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        let tagCounter = TAG_BUTTONS.length;
+
+        // Event Listeners
+        document.getElementById('settings_cancel').addEventListener('click', () => {
+            overlay.remove();
+        });
+
+        // Initialisiere Drag & Drop mit jQuery UI Sortable
+        $('#tags_table').sortable({
+            items: 'tr.sortable-row',
+            handle: '.bqhandle',
+            axis: 'y',
+            cursor: 'move',
+            placeholder: 'ui-state-highlight',
+            helper: function(e, tr) {
+                const $originals = tr.children();
+                const $helper = tr.clone();
+                $helper.children().each(function(index) {
+                    $(this).width($originals.eq(index).width());
+                });
+                return $helper;
+            },
+            start: function(e, ui) {
+                ui.placeholder.height(ui.item.height());
+                ui.placeholder.css('background-color', '#ffffcc');
+            }
+        });
+
+        // Neuen Tag hinzufügen
+        document.getElementById('add_tag_button').addEventListener('click', () => {
+            const table = document.getElementById('tags_table');
+            const newRow = document.createElement('tr');
+            newRow.setAttribute('data-index', tagCounter);
+            newRow.className = 'sortable-row';
+            newRow.innerHTML = `
+                <td style="padding: 5px; text-align: center;">
+                    <div class="bqhandle" style="cursor: move; font-size: 16px;" title="Ziehen zum Verschieben">⋮⋮</div>
+                </td>
+                <td style="padding: 5px;"><input type="text" value="Neuer Tag" id="tooltip_${tagCounter}" style="width: 100%;"></td>
+                <td style="padding: 5px;"><input type="text" value="N" id="label_${tagCounter}" style="width: 100%;"></td>
+                <td style="padding: 5px; text-align: center;"><input type="checkbox" id="multiple_${tagCounter}"></td>
+                <td style="padding: 5px; text-align: center;"><button class="btn btn-delete" data-index="${tagCounter}" style="padding: 2px 8px; background-color: #ffcccc;">❌</button></td>
+            `;
+            table.appendChild(newRow);
+
+            // Event Listener für den neuen Löschen-Button
+            newRow.querySelector('.btn-delete').addEventListener('click', function() {
+                this.closest('tr').remove();
+            });
+
+            // Refresh sortable nach dem Hinzufügen
+            $('#tags_table').sortable('refresh');
+
+            tagCounter++;
+        });
+
+        // Löschen-Buttons
+        document.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('tr').remove();
+            });
+        });
+
+        document.getElementById('settings_save').addEventListener('click', () => {
+            // Sammle alle Zeilen
+            const rows = document.querySelectorAll('#tags_table tr[data-index]');
+            TAG_BUTTONS = [];
+
+            rows.forEach(row => {
+                const index = row.getAttribute('data-index');
+                const tooltipInput = document.getElementById(`tooltip_${index}`);
+                const labelInput = document.getElementById(`label_${index}`);
+                const multipleInput = document.getElementById(`multiple_${index}`);
+
+                if (tooltipInput && labelInput && multipleInput) {
+                    TAG_BUTTONS.push({
+                        tooltip: tooltipInput.value,
+                        label: labelInput.value,
+                        value: labelInput.value,
+                        multiple: multipleInput.checked
+                    });
+                }
+            });
+
+            // Speichere Tag-Position Einstellung
+            const selectedPosition = document.querySelector('input[name="tag_position"]:checked').value;
+            TAG_BEFORE_NAME = selectedPosition === 'before';
+
+            // Speichere in localStorage
+            localStorage.setItem('attack_tagger_buttons', JSON.stringify(TAG_BUTTONS));
+            localStorage.setItem('attack_tagger_before', TAG_BEFORE_NAME.toString());
+
+            overlay.remove();
+            showNotification('Einstellungen gespeichert! Seite neu laden für Änderungen.');
+        });
+
+        // Schließe bei Klick auf Overlay
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+            }
+        });
+    }
+
+})();
