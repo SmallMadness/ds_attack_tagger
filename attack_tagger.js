@@ -12,24 +12,18 @@
 (function() {
     'use strict';
 
-    // KONFIGURATION: Hier die Button-Werte definieren
     let TAG_BUTTONS = [
-        { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false, shortcut: '1' },
-        { label: '*', value: '*', tooltip: 'Eigene Deff', multiple: false, shortcut: '2' },
-        { label: '*S', value: '*S', tooltip: 'Stammes-Deff', multiple: false, shortcut: '3' },
-        { label: 'X', value: 'X', tooltip: 'Getroffen', multiple: false, shortcut: '4' },
-        { label: 'F', value: 'F', tooltip: 'Fake', multiple: false, shortcut: '5' },
-        { label: '?', value: '?', tooltip: 'Unbekannt', multiple: false, shortcut: '6' }
+        { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false, shortcut: '' },
+        { label: '*', value: '*', tooltip: 'Eigene Deff', multiple: false, shortcut: '' },
+        { label: '*S', value: '*S', tooltip: 'Stammes-Deff', multiple: false, shortcut: '' },
+        { label: 'X', value: 'X', tooltip: 'Getroffen', multiple: false, shortcut: '' },
+        { label: 'F', value: 'F', tooltip: 'Fake', multiple: false, shortcut: '' },
+        { label: '?', value: '?', tooltip: 'Unbekannt', multiple: false, shortcut: '' }
     ];
 
-    // Globale Einstellung: Tags vor dem Namen einfügen
     let TAG_BEFORE_NAME = false;
-
-    // Tracking für Änderungen
     let hasChanges = false;
     let saveButtonElement = null;
-
-    // Lade gespeicherte Einstellungen
     const savedButtons = localStorage.getItem('attack_tagger_buttons');
     if (savedButtons) {
         try {
@@ -44,7 +38,6 @@
         TAG_BEFORE_NAME = savedTagBefore === 'true';
     }
 
-    // Warte bis die Seite vollständig geladen ist
     function waitForElement(selector, callback, maxAttempts = 50) {
         let attempts = 0;
         const interval = setInterval(() => {
@@ -58,7 +51,6 @@
         }, 100);
     }
 
-    // Starte nach vollständigem Laden
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
@@ -66,18 +58,15 @@
     }
 
     function init() {
-        // Warte auf den Filter-Link
         waitForElement('a.overview_filters_manage', (filterLink) => {
             createTagButtonBar(filterLink);
             
-            // Überwache Klicks auf den Filter-Link
             filterLink.addEventListener('click', () => {
                 setTimeout(() => {
                     addTagBoxToFilterDialog();
                 }, 300);
             });
 
-            // Prüfe regelmäßig ob das Filter-Formular existiert (z.B. nach Reload)
             setInterval(() => {
                 const filterForm = document.querySelector('form[action*="save_filters"]');
                 if (filterForm && !document.getElementById('tag_filter_box')) {
@@ -104,7 +93,6 @@
     }
 
     function createTagButtonBar(filterLink) {
-        // Erstelle Haupt-Container
         const mainContainer = document.createElement('div');
         mainContainer.style.cssText = `
             margin: 10px 0;
@@ -117,14 +105,12 @@
             align-items: flex-start;
         `;
 
-        // Label hinzufügen
         const label = document.createElement('span');
         label.textContent = 'Tags:';
         label.style.fontWeight = 'bold';
         label.style.marginTop = '4px';
         mainContainer.appendChild(label);
 
-        // Container für die Buttons (mit wrap)
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
             display: flex;
@@ -135,10 +121,8 @@
         `;
         mainContainer.appendChild(buttonContainer);
 
-        // Buttons erstellen
         TAG_BUTTONS.forEach(btn => {
             if (btn.isSeparator) {
-                // Zeilenumbruch: Erzwinge neue Zeile ohne sichtbare Linie
                 const separator = document.createElement('div');
                 separator.style.cssText = `
                     width: 100%;
@@ -149,7 +133,7 @@
                 const button = document.createElement('button');
                 button.textContent = btn.label;
                 button.className = 'btn';
-                button.title = btn.tooltip; // Tooltip beim Hover
+                button.title = btn.tooltip;
                 button.style.cssText = `
                     padding: 4px 10px;
                     cursor: pointer;
@@ -168,10 +152,9 @@
             }
         });
 
-        // Settings Button
         const settingsButton = document.createElement('button');
         settingsButton.textContent = '⚙️';
-        settingsButton.title = 'Einstellungen'; // Tooltip
+        settingsButton.title = 'Einstellungen';
         settingsButton.className = 'btn';
         settingsButton.style.cssText = `
             padding: 4px 10px;
@@ -184,10 +167,9 @@
         });
         mainContainer.appendChild(settingsButton);
 
-        // Button zum Entfernen von Tags
         const removeButton = document.createElement('button');
         removeButton.textContent = '❌';
-        removeButton.title = 'Tags entfernen'; // Tooltip
+        removeButton.title = 'Tags entfernen';
         removeButton.className = 'btn';
         removeButton.style.cssText = `
             padding: 4px 10px;
@@ -202,10 +184,9 @@
         });
         mainContainer.appendChild(removeButton);
 
-        // Speichern Button
         const saveButton = document.createElement('button');
         saveButton.textContent = '💾';
-        saveButton.title = 'Änderungen speichern'; // Tooltip
+        saveButton.title = 'Änderungen speichern';
         saveButton.className = 'btn';
         saveButton.style.cssText = `
             padding: 4px 10px;
@@ -223,21 +204,13 @@
         });
         mainContainer.appendChild(saveButton);
 
-        // Speichere Referenz zum Save Button
         saveButtonElement = saveButton;
-
-        // Füge die Button-Leiste direkt nach dem Filter-Link ein
         filterLink.parentNode.insertBefore(mainContainer, filterLink.nextSibling);
-
-        // Keyboard Shortcuts aktivieren
         setupKeyboardShortcuts();
     }
 
     async function tagSelectedAttacks(tagValue, isMultiple) {
-        // Finde alle markierten Checkboxen (name="id_XXXXXX")
         let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-
-        // Filtere nur die Angriffs-Checkboxen
         checkboxes = Array.from(checkboxes).filter(cb => {
             const name = cb.getAttribute('name');
             return name && name.startsWith('id_');
@@ -268,14 +241,12 @@
 
             let newName;
             if (isMultiple) {
-                // Mehrfach: Füge Tag hinzu ohne bestehende zu entfernen
                 if (TAG_BEFORE_NAME) {
                     newName = `[${tagValue}] ${currentName}`;
                 } else {
                     newName = `${currentName} [${tagValue}]`;
                 }
             } else {
-                // Einmalig: Entferne existierende Tags und ersetze
                 const nameWithoutTags = currentName.replace(/\s*\[.*?\]\s*/g, '').trim();
                 if (TAG_BEFORE_NAME) {
                     newName = `[${tagValue}] ${nameWithoutTags}`;
@@ -296,10 +267,7 @@
     }
 
     async function saveAllSelected() {
-        // Finde alle markierten Checkboxen
         let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-
-        // Filtere nur die Angriffs-Checkboxen
         checkboxes = Array.from(checkboxes).filter(cb => {
             const name = cb.getAttribute('name');
             return name && name.startsWith('id_');
@@ -312,31 +280,25 @@
 
         let count = 0;
 
-        // Verarbeite sequenziell
         for (const checkbox of checkboxes) {
             const row = checkbox.closest('tr');
             if (!row) continue;
 
-            // Finde den Umbenennen-Link
             const renameLink = row.querySelector('a.rename-icon');
             if (!renameLink) continue;
 
-            // Klicke auf den Umbenennen-Link (aktiviert das Edit-Feld)
             renameLink.click();
 
-            // Warte bis der Button sichtbar wird
             let submitButton = null;
             let attempts = 0;
-            const maxAttempts = 30; // 30 * 100ms = 3 Sekunden
+            const maxAttempts = 30;
 
             while (!submitButton && attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Suche den Button in der quickedit-edit Span
                 const quickeditEdit = row.querySelector('.quickedit-edit');
 
                 if (quickeditEdit) {
-                    // Prüfe ob der Button sichtbar ist
                     const style = window.getComputedStyle(quickeditEdit);
                     if (style.display !== 'none') {
                         submitButton = quickeditEdit.querySelector('input[type="button"][value="Umbenennen"]');
@@ -347,13 +309,8 @@
             }
 
             if (submitButton) {
-                // Kurzer Delay vor dem Klick
                 await new Promise(resolve => setTimeout(resolve, 150));
-
-                // Klicke auf den Umbenennen-Button
                 submitButton.click();
-
-                // Warte bis das Popup geschlossen wird
                 await new Promise(resolve => setTimeout(resolve, 400));
             }
 
@@ -362,7 +319,6 @@
 
         if (count > 0) {
             showNotification(`${count} Angriff(e) gespeichert`);
-            // Setze hasChanges zurück nach erfolgreichem Speichern
             hasChanges = false;
             updateSaveButtonState();
         }
@@ -371,7 +327,6 @@
     async function removeTagsFromSelected() {
         let checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
 
-        // Filtere nur die Angriffs-Checkboxen
         checkboxes = Array.from(checkboxes).filter(cb => {
             const name = cb.getAttribute('name');
             return name && name.startsWith('id_');
@@ -395,7 +350,6 @@
             const labelSpan = quickedit.querySelector('.quickedit-label');
             if (!labelSpan) continue;
 
-            // Entferne alle Tags in eckigen Klammern
             const currentName = labelSpan.textContent.trim();
             const newName = currentName.replace(/\s*\[.*?\]\s*/g, '').trim();
 
@@ -409,7 +363,6 @@
     }
 
     function addTagBoxToFilterDialog() {
-        // Finde das Formular mit der action="save_filters"
         const filterForm = document.querySelector('form[action*="save_filters"]');
         if (!filterForm) return;
 
@@ -421,30 +374,24 @@
         const commandInput = filterForm.querySelector('input[name="filters[target_comment]"]');
         if (!commandInput) return;
 
-        // Erstelle einen Wrapper-Div für Filter-Tabelle und Tag-Boxen
         const wrapper = document.createElement('div');
         wrapper.id = 'tag_filter_box';
         wrapper.style.cssText = 'display: flex; gap: 10px; align-items: flex-start;';
         
-        // Füge den Wrapper vor der Filter-Tabelle ein (aber innerhalb des Forms)
         filterTable.parentNode.insertBefore(wrapper, filterTable);
         wrapper.appendChild(filterTable);
 
-        // Gruppiere Buttons nach Separatoren
         const buttonGroups = [[]];
         TAG_BUTTONS.forEach(btn => {
             if (btn.isSeparator) {
-                // Neue Gruppe starten
                 buttonGroups.push([]);
             } else {
-                // Button zur aktuellen Gruppe hinzufügen
                 buttonGroups[buttonGroups.length - 1].push(btn);
             }
         });
 
-        // Erstelle für jede Gruppe eine eigene Spalte
         buttonGroups.forEach((group, groupIndex) => {
-            if (group.length === 0) return; // Leere Gruppen überspringen
+            if (group.length === 0) return;
 
             const tagBox = document.createElement('table');
             tagBox.className = 'vis';
@@ -467,7 +414,6 @@
 
             wrapper.appendChild(tagBox);
 
-            // Füge Buttons zur Gruppe hinzu
             const buttonContainer = tagBox.querySelector('.tag_filter_buttons_group');
             group.forEach(btn => {
                 const button = document.createElement('button');
@@ -490,7 +436,6 @@
                 buttonContainer.appendChild(button);
             });
 
-            // Füge "Filter leeren" Button nur zur letzten Gruppe hinzu
             if (groupIndex === buttonGroups.length - 1) {
                 const clearButton = document.createElement('button');
                 clearButton.textContent = '🗑️ Filter leeren';
@@ -514,12 +459,10 @@
 
     function setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Ignoriere Shortcuts wenn in einem Input-Feld
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 return;
             }
 
-            // Finde den Button mit dem passenden Shortcut
             const button = TAG_BUTTONS.find(btn => btn.shortcut && btn.shortcut.toLowerCase() === e.key.toLowerCase());
             
             if (button) {
@@ -533,7 +476,6 @@
     }
 
     function showNotification(message) {
-        // Erstelle eine temporäre Benachrichtigung
         const notification = document.createElement('div');
         notification.textContent = message;
         notification.style.cssText = `
@@ -551,7 +493,6 @@
 
         document.body.appendChild(notification);
 
-        // Entferne nach 3 Sekunden
         setTimeout(() => {
             notification.style.transition = 'opacity 0.5s';
             notification.style.opacity = '0';
@@ -633,7 +574,6 @@
         helpOverlay.appendChild(helpDialog);
         document.body.appendChild(helpOverlay);
 
-        // Event Listener
         document.getElementById('help_close').addEventListener('click', () => {
             helpOverlay.remove();
         });
@@ -646,7 +586,6 @@
     }
 
     function showSettings() {
-        // Erstelle Settings-Dialog
         const overlay = document.createElement('div');
         overlay.style.cssText = `
             position: fixed;
@@ -732,7 +671,6 @@
 
         let tagCounter = TAG_BUTTONS.length;
 
-        // Event Listeners
         document.getElementById('help_button').addEventListener('click', (e) => {
             e.preventDefault();
             showHelp();
@@ -742,7 +680,6 @@
             overlay.remove();
         });
 
-        // Initialisiere Drag & Drop mit jQuery UI Sortable
         $('#tags_table').sortable({
             items: 'tr.sortable-row',
             handle: '.bqhandle',
@@ -763,7 +700,6 @@
             }
         });
 
-        // Trennlinie hinzufügen
         document.getElementById('add_separator_button').addEventListener('click', () => {
             const table = document.getElementById('tags_table');
             const newRow = document.createElement('tr');
@@ -781,18 +717,15 @@
             `;
             table.appendChild(newRow);
 
-            // Event Listener für den neuen Löschen-Button
             newRow.querySelector('.btn-delete').addEventListener('click', function() {
                 this.closest('tr').remove();
             });
 
-            // Refresh sortable nach dem Hinzufügen
             $('#tags_table').sortable('refresh');
 
             tagCounter++;
         });
 
-        // Neuen Tag hinzufügen
         document.getElementById('add_tag_button').addEventListener('click', () => {
             const table = document.getElementById('tags_table');
             const newRow = document.createElement('tr');
@@ -810,18 +743,15 @@
             `;
             table.appendChild(newRow);
 
-            // Event Listener für den neuen Löschen-Button
             newRow.querySelector('.btn-delete').addEventListener('click', function() {
                 this.closest('tr').remove();
             });
 
-            // Refresh sortable nach dem Hinzufügen
             $('#tags_table').sortable('refresh');
 
             tagCounter++;
         });
 
-        // Löschen-Buttons
         document.querySelectorAll('.btn-delete').forEach(btn => {
             btn.addEventListener('click', function() {
                 this.closest('tr').remove();
@@ -829,7 +759,6 @@
         });
 
         document.getElementById('settings_save').addEventListener('click', () => {
-            // Sammle alle Zeilen
             const rows = document.querySelectorAll('#tags_table tr[data-index]');
             TAG_BUTTONS = [];
 
@@ -859,11 +788,9 @@
                 }
             });
 
-            // Speichere Tag-Position Einstellung
             const selectedPosition = document.querySelector('input[name="tag_position"]:checked').value;
             TAG_BEFORE_NAME = selectedPosition === 'before';
 
-            // Speichere in localStorage
             localStorage.setItem('attack_tagger_buttons', JSON.stringify(TAG_BUTTONS));
             localStorage.setItem('attack_tagger_before', TAG_BEFORE_NAME.toString());
 
@@ -871,7 +798,6 @@
             showNotification('Einstellungen gespeichert! Seite neu laden für Änderungen.');
         });
 
-        // Schließe bei Klick auf Overlay
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 overlay.remove();
