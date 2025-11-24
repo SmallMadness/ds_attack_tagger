@@ -5,6 +5,8 @@
 // @author       Big Madness
 // @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.js
+// @downloadURL  https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.js
 // ==/UserScript==
 
 (function() {
