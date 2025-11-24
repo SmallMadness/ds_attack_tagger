@@ -4,7 +4,6 @@
 // @description  Schnelles Umbenennen von Angriffen mit vordefinierten Werten
 // @author       Big Madness
 // @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
-// @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
 // @grant        none
 // ==/UserScript==
 
@@ -34,7 +33,7 @@
         try {
             TAG_BUTTONS = JSON.parse(savedButtons);
         } catch (e) {
-            console.log('Fehler beim Laden der Einstellungen');
+            console.error('Fehler beim Laden der Einstellungen:', e);
         }
     }
 
@@ -53,7 +52,6 @@
                 callback(element);
             } else if (++attempts >= maxAttempts) {
                 clearInterval(interval);
-                console.log('Element nicht gefunden:', selector);
             }
         }, 100);
     }
@@ -68,26 +66,22 @@
     function init() {
         // Warte auf den Filter-Link
         waitForElement('a.overview_filters_manage', (filterLink) => {
-            console.log('Filter-Link gefunden, erstelle Button-Leiste');
             createTagButtonBar(filterLink);
             
             // Überwache Klicks auf den Filter-Link
             filterLink.addEventListener('click', () => {
-                console.log('Filter-Dialog wird geöffnet...');
-                // Warte kurz bis der Dialog geladen ist
                 setTimeout(() => {
                     addTagBoxToFilterDialog();
                 }, 300);
             });
 
             // Prüfe regelmäßig ob das Filter-Formular existiert (z.B. nach Reload)
-            const checkInterval = setInterval(() => {
+            setInterval(() => {
                 const filterForm = document.querySelector('form[action*="save_filters"]');
                 if (filterForm && !document.getElementById('tag_filter_box')) {
-                    console.log('Filter-Formular gefunden (nach Reload), füge Tag-Box hinzu');
                     addTagBoxToFilterDialog();
                 }
-            }, 500); // Prüfe alle 500ms
+            }, 500);
         });
     }
 
@@ -247,8 +241,6 @@
             return name && name.startsWith('id_');
         });
 
-        console.log('Gefundene Checkboxen:', checkboxes.length);
-
         if (checkboxes.length === 0) {
             alert('Bitte wähle mindestens einen Angriff aus!');
             return;
@@ -259,34 +251,18 @@
         // Verarbeite sequenziell mit async/await
         for (const checkbox of checkboxes) {
             const row = checkbox.closest('tr');
-            if (!row) {
-                console.log('Keine Zeile gefunden für Checkbox');
-                continue;
-            }
+            if (!row) continue;
 
-            // Finde das quickedit Element
             const quickedit = row.querySelector('.quickedit');
-            if (!quickedit) {
-                console.log('Kein quickedit Element gefunden');
-                continue;
-            }
+            if (!quickedit) continue;
 
-            // Hole die Command ID aus dem data-id Attribut
             const commandId = quickedit.getAttribute('data-id');
-            if (!commandId) {
-                console.log('Keine Command ID gefunden');
-                continue;
-            }
+            if (!commandId) continue;
 
-            // Finde das Label-Element innerhalb von quickedit
             const labelSpan = quickedit.querySelector('.quickedit-label');
-            if (!labelSpan) {
-                console.log('Kein Label gefunden für Command:', commandId);
-                continue;
-            }
+            if (!labelSpan) continue;
 
             const currentName = labelSpan.textContent.trim();
-            console.log('Aktueller Name:', currentName);
 
             let newName;
             if (isMultiple) {
@@ -306,14 +282,9 @@
                 }
             }
 
-            // Aktualisiere das Label im DOM sofort
             labelSpan.textContent = newName;
-            console.log('Name im DOM geändert:', newName);
-
             count++;
         }
-
-        console.log(`${count} Angriffe mit Tag [${tagValue}] versehen`);
 
         if (count > 0) {
             showNotification(`${count} Angriff(e) mit [${tagValue}] getaggt`);
@@ -346,14 +317,10 @@
 
             // Finde den Umbenennen-Link
             const renameLink = row.querySelector('a.rename-icon');
-            if (!renameLink) {
-                console.log('Kein Umbenennen-Link gefunden');
-                continue;
-            }
+            if (!renameLink) continue;
 
             // Klicke auf den Umbenennen-Link (aktiviert das Edit-Feld)
             renameLink.click();
-            console.log('Umbenennen-Link geklickt');
 
             // Warte bis der Button sichtbar wird
             let submitButton = null;
@@ -371,39 +338,26 @@
                     const style = window.getComputedStyle(quickeditEdit);
                     if (style.display !== 'none') {
                         submitButton = quickeditEdit.querySelector('input[type="button"][value="Umbenennen"]');
-                        if (submitButton) {
-                            console.log('Button gefunden nach', attempts * 100, 'ms');
-                        }
                     }
-                }
-
-                if (!submitButton && attempts % 10 === 0) {
-                    console.log(`Versuch ${attempts}: Button noch nicht sichtbar`);
                 }
 
                 attempts++;
             }
 
             if (submitButton) {
-                console.log('Button gefunden nach', attempts * 100, 'ms');
-
                 // Kurzer Delay vor dem Klick
                 await new Promise(resolve => setTimeout(resolve, 150));
 
                 // Klicke auf den Umbenennen-Button
                 submitButton.click();
-                console.log('Umbenennen-Button geklickt');
 
                 // Warte bis das Popup geschlossen wird
                 await new Promise(resolve => setTimeout(resolve, 400));
-            } else {
-                console.log('❌ Umbenennen-Button nicht gefunden nach', attempts * 100, 'ms');
             }
 
             count++;
         }
 
-        console.log(`${count} Angriffe gespeichert`);
         if (count > 0) {
             showNotification(`${count} Angriff(e) gespeichert`);
             // Setze hasChanges zurück nach erfolgreichem Speichern
@@ -443,14 +397,10 @@
             const currentName = labelSpan.textContent.trim();
             const newName = currentName.replace(/\s*\[.*?\]\s*/g, '').trim();
 
-            // Aktualisiere das Label im DOM sofort
             labelSpan.textContent = newName;
-            console.log('Tags im DOM entfernt:', newName);
-
             count++;
         }
 
-        console.log(`Tags von ${count} Angriffen entfernt`);
         if (count > 0) {
             showNotification(`Tags von ${count} Angriff(en) entfernt`);
         }
@@ -459,71 +409,65 @@
     function addTagBoxToFilterDialog() {
         // Finde das Formular mit der action="save_filters"
         const filterForm = document.querySelector('form[action*="save_filters"]');
-        if (!filterForm) {
-            console.log('Filter-Formular nicht gefunden');
-            return;
-        }
+        if (!filterForm) return;
 
-        // Finde die Filter-Tabelle innerhalb des Formulars
         const filterTable = filterForm.querySelector('table.vis');
-        if (!filterTable) {
-            console.log('Filter-Tabelle nicht gefunden');
-            return;
-        }
+        if (!filterTable) return;
 
-        // Prüfe ob die Tag-Box bereits existiert
-        if (document.getElementById('tag_filter_box')) {
-            console.log('Tag-Box existiert bereits');
-            return;
-        }
+        if (document.getElementById('tag_filter_box')) return;
 
-        // Finde das Befehl-Input-Feld
         const commandInput = filterForm.querySelector('input[name="filters[target_comment]"]');
-        if (!commandInput) {
-            console.log('Befehl-Feld nicht gefunden');
-            return;
-        }
+        if (!commandInput) return;
 
-        console.log('Erstelle Tag-Filter-Box');
-
-        // Erstelle Container für die Tag-Box
-        const tagBox = document.createElement('table');
-        tagBox.id = 'tag_filter_box';
-        tagBox.className = 'vis';
-        tagBox.style.cssText = `
-            margin-left: 10px;
-            vertical-align: top;
-        `;
-
-        tagBox.innerHTML = `
-            <tr>
-                <th>Schnellfilter nach Tags</th>
-            </tr>
-            <tr>
-                <td style="padding: 10px;">
-                    <div id="tag_filter_buttons" style="display: flex; flex-direction: column; gap: 5px;">
-                    </div>
-                </td>
-            </tr>
-        `;
-
-        // Erstelle einen Wrapper-Div für beide Tabellen
+        // Erstelle einen Wrapper-Div für Filter-Tabelle und Tag-Boxen
         const wrapper = document.createElement('div');
+        wrapper.id = 'tag_filter_box';
         wrapper.style.cssText = 'display: flex; gap: 10px; align-items: flex-start;';
         
         // Füge den Wrapper vor der Filter-Tabelle ein (aber innerhalb des Forms)
         filterTable.parentNode.insertBefore(wrapper, filterTable);
         wrapper.appendChild(filterTable);
-        wrapper.appendChild(tagBox);
 
-        // Erstelle Buttons für jeden Tag
-        const buttonContainer = document.getElementById('tag_filter_buttons');
+        // Gruppiere Buttons nach Separatoren
+        const buttonGroups = [[]];
         TAG_BUTTONS.forEach(btn => {
             if (btn.isSeparator) {
-                // Zeilenumbruch im Filter-Dialog (kein Button)
-                // Separator wird einfach übersprungen, da Buttons untereinander sind
-                return;
+                // Neue Gruppe starten
+                buttonGroups.push([]);
             } else {
+                // Button zur aktuellen Gruppe hinzufügen
+                buttonGroups[buttonGroups.length - 1].push(btn);
+            }
+        });
+
+        // Erstelle für jede Gruppe eine eigene Spalte
+        buttonGroups.forEach((group, groupIndex) => {
+            if (group.length === 0) return; // Leere Gruppen überspringen
+
+            const tagBox = document.createElement('table');
+            tagBox.className = 'vis';
+            tagBox.style.cssText = `
+                margin-left: 10px;
+                vertical-align: top;
+            `;
+
+            tagBox.innerHTML = `
+                <tr>
+                    <th>${groupIndex === 0 ? 'Schnellfilter nach Tags' : '&nbsp;'}</th>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;">
+                        <div class="tag_filter_buttons_group" style="display: flex; flex-direction: column; gap: 5px;">
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            wrapper.appendChild(tagBox);
+
+            // Füge Buttons zur Gruppe hinzu
+            const buttonContainer = tagBox.querySelector('.tag_filter_buttons_group');
+            group.forEach(btn => {
                 const button = document.createElement('button');
                 button.textContent = `[${btn.label}] ${btn.tooltip}`;
                 button.className = 'btn';
@@ -536,33 +480,34 @@
 
                 button.addEventListener('click', (e) => {
                     e.preventDefault();
-                    // Setze den Tag-Wert in das Befehl-Feld
                     commandInput.value = `[${btn.label}]`;
                     commandInput.focus();
                     showNotification(`Filter auf [${btn.label}] gesetzt`);
                 });
 
                 buttonContainer.appendChild(button);
+            });
+
+            // Füge "Filter leeren" Button nur zur letzten Gruppe hinzu
+            if (groupIndex === buttonGroups.length - 1) {
+                const clearButton = document.createElement('button');
+                clearButton.textContent = '🗑️ Filter leeren';
+                clearButton.className = 'btn';
+                clearButton.style.cssText = `
+                    padding: 5px 10px;
+                    cursor: pointer;
+                    width: 100%;
+                    background-color: #ffcccc;
+                    margin-top: 5px;
+                `;
+                clearButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    commandInput.value = '';
+                    commandInput.focus();
+                });
+                buttonContainer.appendChild(clearButton);
             }
         });
-
-        // Button zum Leeren des Filters
-        const clearButton = document.createElement('button');
-        clearButton.textContent = '🗑️ Filter leeren';
-        clearButton.className = 'btn';
-        clearButton.style.cssText = `
-            padding: 5px 10px;
-            cursor: pointer;
-            width: 100%;
-            background-color: #ffcccc;
-            margin-top: 5px;
-        `;
-        clearButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            commandInput.value = '';
-            commandInput.focus();
-        });
-        buttonContainer.appendChild(clearButton);
     }
 
     function setupKeyboardShortcuts() {
