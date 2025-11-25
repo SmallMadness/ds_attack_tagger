@@ -3,14 +3,45 @@
 // @version      1.0
 // @description  Schnelles Umbenennen von Angriffen mit vordefinierten Werten
 // @author       Big Madness
+// @license      MIT
 // @match        https://*.die-staemme.de/game.php?*screen=overview_villages*
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.js
-// @downloadURL  https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.js
+// @updateURL    https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.user.js
+// @downloadURL  https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/refs/heads/main/attack_tagger.user.js
 // ==/UserScript==
+
+/*
+ * MIT License
+ * 
+ * Copyright (c) 2025 Big Madness
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 (function() {
     'use strict';
+
+    // Script API Registration
+    var api = typeof unsafeWindow != 'undefined' ? unsafeWindow.ScriptAPI : window.ScriptAPI;
+    if (api) {
+        api.register('Attack Tagger', true, 'Big Madness', 'support-nur-im-forum@die-staemme.de');
+    }
 
     let TAG_BUTTONS = [
         { label: '!', value: '!', tooltip: 'Rausstellen', multiple: false, shortcut: '' },
@@ -673,9 +704,10 @@
                 <div style="white-space: nowrap;">
                     <label>
                         <input type="radio" name="tag_position" value="before" ${TAG_BEFORE_NAME ? 'checked' : ''}>
-                        [x] Name [x]
+                        Prefix <b>|</b>
                     </label>
                     <label style="margin-right: 10px;">
+                        Suffix
                         <input type="radio" name="tag_position" value="after" ${!TAG_BEFORE_NAME ? 'checked' : ''}>
                     </label>
                 </div>
@@ -860,9 +892,3 @@
     }
 
 })();
-
-
-
-
-
-
