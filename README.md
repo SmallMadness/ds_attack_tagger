@@ -79,7 +79,7 @@ Hast du einen Bug gefunden? [Erstelle ein Issue](https://github.com/SmallMadness
 ## 📝 Changelog
 
 ### Version 1.0 (2024-11-24)
-- ✨ Initiales Release
+- ✨ Initialer Release
 - 🏷️ Tag-System mit 6 Standard-Tags
 - ⌨️ Keyboard Shortcuts
 - 🎨 Anpassbare Tags
@@ -92,8 +92,111 @@ Hast du einen Bug gefunden? [Erstelle ein Issue](https://github.com/SmallMadness
 
 ## 📜 Lizenz
 
-Dieses Script ist frei verfügbar für die Die Stämme Community.
+MIT License - Dieses Script ist frei verfügbar für die Die Stämme Community.
 
 ---
 
 ⭐ **Gefällt dir das Script? Gib dem Repo einen Stern!** ⭐
+
+---
+---
+
+# 🏰 Tribal Wars - Attack Tagger
+
+Quick and easy tagging of incoming attacks in Tribal Wars (Die Stämme).
+
+## ✨ Features
+
+- 🏷️ **Quick Tagging**: Mark attacks with predefined tags
+- ⌨️ **Keyboard Shortcuts**: Use hotkeys (1-6) for even faster tagging
+- 🎨 **Customizable**: Create your own tags with individual symbols
+- 📊 **Filter Integration**: Filter attacks directly by tags
+- 🔄 **Auto-Updates**: Automatic updates via Tampermonkey
+- 💾 **Persistence**: All settings are saved locally
+
+## 📥 Installation
+
+1. **Install Tampermonkey:**
+   - [Chrome](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+   - [Firefox](https://addons.mozilla.org/en/firefox/addon/tampermonkey/)
+   - [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
+
+2. **Install the Script:**
+   
+   **[📥 Click here to install](https://raw.githubusercontent.com/SmallMadness/ds_attack_tagger/main/attack_tagger.user.js)**
+
+3. **Done!** 🎉 The script is now active on all Tribal Wars pages.
+
+## 🎯 Usage
+
+### Quick Start
+
+1. Open the **Incoming Attacks Overview** in Tribal Wars
+2. Select attacks (checkboxes)
+3. Click on a tag button (e.g. `[!]` for Deploy)
+4. Click **💾 Save**
+
+### Keyboard Shortcuts
+
+| Key | Tag | Description |
+|-----|-----|-------------|
+| `1` | `[!]` | Deploy |
+| `2` | `[*]` | Own Defense |
+| `3` | `[*S]` | Tribe Defense |
+| `4` | `[X]` | Hit |
+| `5` | `[F]` | Fake |
+| `6` | `[?]` | Unknown |
+
+### Customize Tags
+
+1. Click on **⚙️ Settings**
+2. Edit existing tags or add new ones
+3. Use **⋮⋮** to drag & drop for reordering
+4. Add **Separators** for better organization
+5. Click **Save** and reload the page
+
+### Using Filters
+
+1. Click on **"Manage Filters"**
+2. Use the **Quick Filter Buttons** on the right
+3. Click on a tag → Filter is automatically set
+4. Only attacks with this tag will be displayed
+
+## 📸 Screenshots
+
+*Add screenshots here later*
+
+## ⚙️ Settings
+
+- **Description**: Name of the tag (shown as tooltip)
+- **Symbol**: The character in the tag (e.g. `!`, `*`, `F`)
+- **Shortcut**: Keyboard shortcut (single key)
+- **Multiple**: Add tags instead of replacing them
+- **Position**: Tags before or after the attack name
+- **Separators**: Visual grouping of tags
+
+## 🐛 Report Issues
+
+Found a bug? [Create an Issue](https://github.com/SmallMadness/ds_attack_tagger/issues)
+
+## 📝 Changelog
+
+### Version 1.0 (2024-11-24)
+- ✨ Initial Release
+- 🏷️ Tag system with 6 default tags
+- ⌨️ Keyboard shortcuts
+- 🎨 Customizable tags
+- 📊 Filter integration
+- 🔄 Separator function
+
+## 👤 Author
+
+**Big Madness**
+
+## 📜 License
+
+MIT License - This script is freely available for the Tribal Wars community.
+
+---
+
+⭐ **Like this script? Give the repo a star!** ⭐
